@@ -1,0 +1,14 @@
+# Tri-Model Deep Search Pipeline Dependencies
+
+# HTTP client for async API calls
+httpx>=0.25.0
+
+# YAML configuration parsing
+pyyaml>=6.0
+
+# Optional: DuckDuckGo search (no API key required)
+duckduckgo-search>=4.0.0
+
+# Development dependencies
+pytest>=7.0.0
+pytest-asyncio>=0.21.0

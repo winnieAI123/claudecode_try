@@ -1,0 +1,126 @@
+# Tri-Model Deep Search Configuration
+# All behavior is configurable via this single file
+
+tri_search:
+  # Query language: auto (detect from input) | zh (Chinese) | en (English)
+  query_language: "auto"
+
+  # Region affects search localization if supported
+  region: "US"
+
+  # Freshness preference for search results (in days)
+  time_window_days: 30
+
+  # Maximum number of sources to collect per stage
+  max_sources_per_stage: 8
+
+  # Maximum bullet points per section in output
+  max_bullets_per_section: 8
+
+  # Remove duplicate sources across stages
+  dedup_sources_across_stages: true
+
+  # MUST remain true - enforces DeepSeek → Gemini → ChatGPT order
+  strict_stage_order: true
+
+  # Output style: buy_side_brief_cn | buy_side_brief_en
+  output_style: "buy_side_brief_cn"
+
+  # Include opposing viewpoints in research
+  include_opposing_views: true
+
+  # Include neutral viewpoints in research
+  include_neutral_views: true
+
+  # Citation format: inline_url | footnote
+  citation_format: "inline_url"
+
+  # Query expansion settings
+  query_expansion:
+    # Number of expanded queries to generate
+    min_expanded_queries: 3
+    max_expanded_queries: 8
+    # Number of counter-queries for opposing evidence
+    min_counter_queries: 2
+    max_counter_queries: 4
+
+  # Timeout settings (in seconds)
+  timeouts:
+    api_call: 60
+    search: 30
+    total_stage: 120
+
+# Caching configuration
+cache:
+  enabled: true
+  # Cache time-to-live in hours
+  ttl_hours: 24
+  # Cache directory (relative to project root)
+  cache_dir: "./cache"
+  # Cache key includes: topic + time_window + region + query_set_hash
+
+# Logging configuration
+logging:
+  enabled: true
+  # Log directory (relative to project root)
+  log_dir: "./logs"
+  # Save raw API responses for debugging
+  save_raw_responses: true
+  # Log level: DEBUG | INFO | WARNING | ERROR
+  level: "INFO"
+  # Log format
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# API credentials (via environment variables - NEVER hardcode secrets)
+credentials:
+  deepseek:
+    # Environment variable name for DeepSeek API key
+    api_key_env: "DEEPSEEK_API_KEY"
+    # Optional: Environment variable for custom base URL
+    base_url_env: "DEEPSEEK_BASE_URL"
+    # Default base URL if env var not set
+    default_base_url: "https://api.deepseek.com/v1"
+    # Model to use
+    model: "deepseek-chat"
+
+  gemini:
+    # Environment variable name for Gemini API key
+    api_key_env: "GEMINI_API_KEY"
+    # Optional: Environment variable for custom base URL
+    base_url_env: "GEMINI_BASE_URL"
+    # Model to use
+    model: "gemini-pro"
+
+  openai:
+    # Environment variable name for OpenAI API key
+    api_key_env: "OPENAI_API_KEY"
+    # Optional: Environment variable for custom base URL
+    base_url_env: "OPENAI_BASE_URL"
+    # Default base URL if env var not set
+    default_base_url: "https://api.openai.com/v1"
+    # Model to use
+    model: "gpt-4-turbo-preview"
+
+# Search provider configuration
+search:
+  # Search provider: serper | serpapi | bing | duckduckgo
+  provider: "serper"
+  # Environment variable for search API key
+  api_key_env: "SEARCH_API_KEY"
+  # Number of results to fetch per query
+  results_per_query: 10
+  # Include news results
+  include_news: true
+  # Safe search: off | moderate | strict
+  safe_search: "moderate"
+
+# Retry configuration
+retry:
+  # Maximum retry attempts for API calls
+  max_attempts: 3
+  # Initial backoff delay in seconds
+  initial_backoff: 2
+  # Backoff multiplier (exponential)
+  backoff_multiplier: 2
+  # Maximum backoff delay in seconds
+  max_backoff: 16
