@@ -1,0 +1,146 @@
+# Tri-Model Deep Search Configuration
+# All behavior is configurable via this single file
+
+tri_search:
+  # Query language: auto (detect from input) | zh (Chinese) | en (English)
+  query_language: "auto"
+
+  # Region affects search localization if supported
+  region: "US"
+
+  # Freshness preference for search results (in days)
+  time_window_days: 30
+
+  # Maximum number of sources to collect per stage
+  max_sources_per_stage: 8
+
+  # Maximum bullet points per section in output
+  max_bullets_per_section: 8
+
+  # Remove duplicate sources across stages
+  dedup_sources_across_stages: true
+
+  # MUST remain true - enforces DeepSeek → Gemini → ChatGPT order
+  strict_stage_order: true
+
+  # Output style: buy_side_brief_cn | buy_side_brief_en
+  output_style: "buy_side_brief_cn"
+
+  # Include opposing viewpoints in research
+  include_opposing_views: true
+
+  # Include neutral viewpoints in research
+  include_neutral_views: true
+
+  # Citation format: inline_url | footnote
+  citation_format: "inline_url"
+
+  # Query expansion settings
+  query_expansion:
+    # Number of expanded queries to generate
+    min_expanded_queries: 3
+    max_expanded_queries: 8
+    # Number of counter-queries for opposing evidence
+    min_counter_queries: 2
+    max_counter_queries: 4
+
+  # Timeout settings (in seconds)
+  timeouts:
+    api_call: 60
+    search: 30
+    total_stage: 120
+
+# Caching configuration
+cache:
+  enabled: true
+  # Cache time-to-live in hours
+  ttl_hours: 24
+  # Cache directory (relative to project root)
+  cache_dir: "./cache"
+  # Cache key includes: topic + time_window + region + query_set_hash
+
+# Logging configuration
+logging:
+  enabled: true
+  # Log directory (relative to project root)
+  log_dir: "./logs"
+  # Save raw API responses for debugging
+  save_raw_responses: true
+  # Log level: DEBUG | INFO | WARNING | ERROR
+  level: "INFO"
+  # Log format
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# API credentials (via environment variables - NEVER hardcode secrets)
+credentials:
+  # DeepSeek via OpenRouter
+  deepseek:
+    # Use OpenRouter API key
+    api_key_env: "OPENROUTER_API_KEY"
+    # OpenRouter base URL
+    default_base_url: "https://openrouter.ai/api/v1"
+    # OpenRouter model name for DeepSeek
+    model: "deepseek/deepseek-chat"
+    # Provider type: openrouter | direct
+    provider_type: "openrouter"
+
+  # Gemini via official AI Studio API (with native search grounding)
+  gemini:
+    # Google AI Studio API key
+    api_key_env: "GEMINI_API_KEY"
+    # Official Gemini API base URL
+    default_base_url: "https://generativelanguage.googleapis.com/v1beta"
+    # Model to use (gemini-1.5-flash or gemini-1.5-pro recommended for grounding)
+    model: "gemini-2.0-flash"
+    # Enable native Google Search grounding
+    enable_grounding: true
+    # Provider type
+    provider_type: "google"
+
+  # OpenAI/ChatGPT via OpenRouter
+  openai:
+    # Use OpenRouter API key
+    api_key_env: "OPENROUTER_API_KEY"
+    # OpenRouter base URL
+    default_base_url: "https://openrouter.ai/api/v1"
+    # OpenRouter model name for GPT-4
+    model: "openai/gpt-4-turbo"
+    # Provider type: openrouter | direct
+    provider_type: "openrouter"
+
+# Search provider configuration (for DeepSeek and OpenAI stages)
+# Gemini uses native Google Search grounding, so this is only for other providers
+search:
+  # Search provider: perplexity (via OpenRouter) | duckduckgo (free) | serper | serpapi
+  provider: "perplexity"
+  # Environment variable for API key
+  # - For perplexity: uses OPENROUTER_API_KEY (same key as LLM providers)
+  # - For serper/serpapi: uses SEARCH_API_KEY
+  api_key_env: "OPENROUTER_API_KEY"
+  # Perplexity model to use (via OpenRouter)
+  # Options: perplexity/sonar | perplexity/sonar-pro | perplexity/sonar-reasoning
+  perplexity_model: "perplexity/sonar"
+  # Number of results to fetch per query
+  results_per_query: 10
+  # Include news results
+  include_news: true
+  # Safe search: off | moderate | strict
+  safe_search: "moderate"
+
+# Retry configuration
+retry:
+  # Maximum retry attempts for API calls
+  max_attempts: 3
+  # Initial backoff delay in seconds
+  initial_backoff: 2
+  # Backoff multiplier (exponential)
+  backoff_multiplier: 2
+  # Maximum backoff delay in seconds
+  max_backoff: 16
+
+# OpenRouter specific settings
+openrouter:
+  # Your site URL (for OpenRouter ranking, optional)
+  site_url_env: "OPENROUTER_SITE_URL"
+  # Your app name (for OpenRouter ranking, optional)
+  app_name: "TriModelDeepSearch"
