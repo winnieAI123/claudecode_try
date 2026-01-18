@@ -111,10 +111,15 @@ credentials:
 # Search provider configuration (for DeepSeek and OpenAI stages)
 # Gemini uses native Google Search grounding, so this is only for other providers
 search:
-  # Search provider: duckduckgo (free) | serper | serpapi
-  provider: "duckduckgo"
-  # Environment variable for search API key (not needed for duckduckgo)
-  api_key_env: "SEARCH_API_KEY"
+  # Search provider: perplexity (via OpenRouter) | duckduckgo (free) | serper | serpapi
+  provider: "perplexity"
+  # Environment variable for API key
+  # - For perplexity: uses OPENROUTER_API_KEY (same key as LLM providers)
+  # - For serper/serpapi: uses SEARCH_API_KEY
+  api_key_env: "OPENROUTER_API_KEY"
+  # Perplexity model to use (via OpenRouter)
+  # Options: perplexity/sonar | perplexity/sonar-pro | perplexity/sonar-reasoning
+  perplexity_model: "perplexity/sonar"
   # Number of results to fetch per query
   results_per_query: 10
   # Include news results

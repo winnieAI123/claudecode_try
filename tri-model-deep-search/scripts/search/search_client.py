@@ -1,6 +1,6 @@
 """
 Search client for web searches.
-Supports multiple search providers: Serper, SerpAPI, Bing, DuckDuckGo.
+Supports multiple search providers: Perplexity (via OpenRouter), Serper, SerpAPI, DuckDuckGo.
 """
 
 import os
@@ -8,6 +8,7 @@ import asyncio
 import logging
 import hashlib
 import json
+import re
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Optional
@@ -54,6 +55,130 @@ class BaseSearchProvider(ABC):
     async def search(self, query: str, num_results: int = 10) -> list[SearchResult]:
         """Execute a search query."""
         pass
+
+
+class PerplexitySearchProvider(BaseSearchProvider):
+    """
+    Perplexity search provider via OpenRouter.
+    Uses Perplexity's online models which have built-in web search.
+    """
+
+    def __init__(self, config: dict):
+        super().__init__(config)
+        # Use OpenRouter API key
+        self._api_key = os.environ.get(config.get("api_key_env", "OPENROUTER_API_KEY"))
+        self._base_url = "https://openrouter.ai/api/v1"
+        # Default to sonar-small for cost efficiency, can be changed in config
+        self._model = config.get("perplexity_model", "perplexity/sonar")
+
+    async def search(self, query: str, num_results: int = 10) -> list[SearchResult]:
+        """
+        Execute a search using Perplexity via OpenRouter.
+        Perplexity online models perform web search and return citations.
+        """
+        if not self._api_key:
+            self.logger.error("OpenRouter API key not found for Perplexity search")
+            return []
+
+        headers = {
+            "Authorization": f"Bearer {self._api_key}",
+            "Content-Type": "application/json",
+        }
+
+        # Optional OpenRouter headers
+        site_url = os.environ.get("OPENROUTER_SITE_URL", "")
+        if site_url:
+            headers["HTTP-Referer"] = site_url
+        headers["X-Title"] = "TriModelDeepSearch"
+
+        # Build a search-optimized prompt
+        prompt = f"""请搜索并回答以下问题，提供详细信息和来源链接：
+
+{query}
+
+请确保：
+1. 提供最新的信息
+2. 包含具体的来源URL
+3. 列出多个相关的搜索结果和来源"""
+
+        payload = {
+            "model": self._model,
+            "messages": [{"role": "user", "content": prompt}],
+            "temperature": 0.3,
+            "max_tokens": 2048
+        }
+
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            try:
+                response = await client.post(
+                    f"{self._base_url}/chat/completions",
+                    headers=headers,
+                    json=payload
+                )
+                response.raise_for_status()
+                data = response.json()
+
+                # Extract content and citations
+                content = data["choices"][0]["message"]["content"]
+
+                # Extract URLs from the response
+                urls = re.findall(r'https?://[^\s\)\]]+', content)
+                urls = list(dict.fromkeys(urls))  # Remove duplicates while preserving order
+
+                results = []
+
+                # Create search results from extracted URLs
+                for i, url in enumerate(urls[:num_results]):
+                    # Try to extract context around the URL
+                    snippet = self._extract_snippet_for_url(content, url)
+                    results.append(SearchResult(
+                        title=f"来源 {i+1}",
+                        url=url,
+                        snippet=snippet,
+                        source="Perplexity",
+                        date=None
+                    ))
+
+                # If we got content but no URLs, still return the content as context
+                if not results and content:
+                    results.append(SearchResult(
+                        title="Perplexity 搜索结果",
+                        url="",
+                        snippet=content[:500],
+                        source="Perplexity",
+                        date=None
+                    ))
+
+                self.logger.info(f"Perplexity search found {len(results)} results for: {query[:50]}...")
+                return results
+
+            except httpx.HTTPStatusError as e:
+                self.logger.error(f"Perplexity search failed with status {e.response.status_code}")
+                return []
+            except Exception as e:
+                self.logger.error(f"Perplexity search failed: {e}")
+                return []
+
+    def _extract_snippet_for_url(self, content: str, url: str) -> str:
+        """Extract a snippet of text around a URL mention."""
+        # Find the URL in content and extract surrounding text
+        idx = content.find(url)
+        if idx == -1:
+            return ""
+
+        # Get 200 chars before and after
+        start = max(0, idx - 200)
+        end = min(len(content), idx + len(url) + 200)
+        snippet = content[start:end]
+
+        # Clean up
+        snippet = snippet.strip()
+        if start > 0:
+            snippet = "..." + snippet
+        if end < len(content):
+            snippet = snippet + "..."
+
+        return snippet
 
 
 class SerperSearchProvider(BaseSearchProvider):
@@ -209,16 +334,18 @@ class SearchClient:
         self.logger = logging.getLogger(self.__class__.__name__)
 
         # Initialize the appropriate provider
-        provider_name = config.get("provider", "serper").lower()
-        if provider_name == "serper":
+        provider_name = config.get("provider", "perplexity").lower()
+        if provider_name == "perplexity":
+            self._provider = PerplexitySearchProvider(config)
+        elif provider_name == "serper":
             self._provider = SerperSearchProvider(config)
         elif provider_name == "serpapi":
             self._provider = SerpAPISearchProvider(config)
         elif provider_name == "duckduckgo":
             self._provider = DuckDuckGoSearchProvider(config)
         else:
-            self.logger.warning(f"Unknown provider {provider_name}, defaulting to DuckDuckGo")
-            self._provider = DuckDuckGoSearchProvider(config)
+            self.logger.warning(f"Unknown provider {provider_name}, defaulting to Perplexity")
+            self._provider = PerplexitySearchProvider(config)
 
         # Initialize cache
         self._cache_enabled = self.cache_config.get("enabled", False)
