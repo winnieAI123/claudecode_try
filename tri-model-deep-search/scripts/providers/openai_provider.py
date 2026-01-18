@@ -1,5 +1,5 @@
 """
-OpenAI/ChatGPT provider implementation.
+OpenAI/ChatGPT provider implementation via OpenRouter.
 Handles Stage 3 of the tri-model deep search pipeline.
 """
 
@@ -16,6 +16,7 @@ from .base import BaseProvider, StageResult, ResearchPlan
 class OpenAIProvider(BaseProvider):
     """
     OpenAI (ChatGPT) LLM provider for Stage 3 of the pipeline.
+    Uses OpenRouter API for access to OpenAI models.
     Provides final independent analysis with fresh search results.
     """
 
@@ -29,7 +30,8 @@ class OpenAIProvider(BaseProvider):
         """
         super().__init__(config, search_client)
         self._client: Optional[httpx.AsyncClient] = None
-        self._model = config.get("model", "gpt-4-turbo-preview")
+        self._model = config.get("model", "openai/gpt-4-turbo")
+        self._provider_type = config.get("provider_type", "openrouter")
 
     @property
     def name(self) -> str:
@@ -38,38 +40,49 @@ class OpenAIProvider(BaseProvider):
 
     def initialize(self) -> bool:
         """
-        Initialize the OpenAI provider.
+        Initialize the OpenAI provider via OpenRouter.
         Load API key from environment and validate.
 
         Returns:
             True if initialization successful, False otherwise
         """
         try:
-            # Get API key from environment
-            api_key_env = self.config.get("api_key_env", "OPENAI_API_KEY")
+            # Get API key from environment (OpenRouter key)
+            api_key_env = self.config.get("api_key_env", "OPENROUTER_API_KEY")
             self._api_key = os.environ.get(api_key_env)
 
             if not self._api_key:
                 self.logger.error(f"API key not found in environment variable: {api_key_env}")
                 return False
 
-            # Get base URL
-            base_url_env = self.config.get("base_url_env", "OPENAI_BASE_URL")
-            self._base_url = os.environ.get(base_url_env) or self.config.get(
-                "default_base_url", "https://api.openai.com/v1"
+            # Get base URL (OpenRouter)
+            self._base_url = self.config.get(
+                "default_base_url", "https://openrouter.ai/api/v1"
             )
+
+            # Build headers for OpenRouter
+            headers = {
+                "Authorization": f"Bearer {self._api_key}",
+                "Content-Type": "application/json",
+            }
+
+            # Optional OpenRouter headers
+            site_url = os.environ.get("OPENROUTER_SITE_URL", "")
+            if site_url:
+                headers["HTTP-Referer"] = site_url
+
+            app_name = self.config.get("app_name", "TriModelDeepSearch")
+            if app_name:
+                headers["X-Title"] = app_name
 
             # Initialize async HTTP client
             self._client = httpx.AsyncClient(
                 base_url=self._base_url,
-                headers={
-                    "Authorization": f"Bearer {self._api_key}",
-                    "Content-Type": "application/json"
-                },
+                headers=headers,
                 timeout=self.config.get("timeout", 60.0)
             )
 
-            self.logger.info("OpenAI provider initialized successfully")
+            self.logger.info(f"OpenAI provider initialized via OpenRouter (model: {self._model})")
             return True
 
         except Exception as e:
@@ -78,7 +91,7 @@ class OpenAIProvider(BaseProvider):
 
     async def _call_api(self, messages: list[dict], temperature: float = 0.7) -> str:
         """
-        Make an API call to OpenAI.
+        Make an API call to OpenAI via OpenRouter.
 
         Args:
             messages: List of message dictionaries
@@ -181,7 +194,7 @@ class OpenAIProvider(BaseProvider):
 
         Args:
             research_plan: The unified research plan
-            search_results: Pre-fetched search results (fresh, not from previous stages)
+            search_results: Pre-fetched search results from DuckDuckGo
 
         Returns:
             StageResult containing findings, opinions, gaps, and sources
@@ -198,7 +211,7 @@ class OpenAIProvider(BaseProvider):
             prompt = self._build_analysis_prompt(research_plan, search_results)
             messages = [{"role": "user", "content": prompt}]
 
-            # Call OpenAI API
+            # Call OpenAI API via OpenRouter
             response = await self._call_api(messages, temperature=0.3)
 
             # Parse the response

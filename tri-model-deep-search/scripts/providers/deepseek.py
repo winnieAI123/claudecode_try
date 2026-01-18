@@ -1,5 +1,5 @@
 """
-DeepSeek provider implementation.
+DeepSeek provider implementation via OpenRouter.
 Handles Stage 1 of the tri-model deep search pipeline.
 """
 
@@ -16,6 +16,7 @@ from .base import BaseProvider, StageResult, ResearchPlan
 class DeepSeekProvider(BaseProvider):
     """
     DeepSeek LLM provider for Stage 1 of the pipeline.
+    Uses OpenRouter API for access to DeepSeek models.
     Responsible for initial query expansion and research analysis.
     """
 
@@ -29,7 +30,8 @@ class DeepSeekProvider(BaseProvider):
         """
         super().__init__(config, search_client)
         self._client: Optional[httpx.AsyncClient] = None
-        self._model = config.get("model", "deepseek-chat")
+        self._model = config.get("model", "deepseek/deepseek-chat")
+        self._provider_type = config.get("provider_type", "openrouter")
 
     @property
     def name(self) -> str:
@@ -38,38 +40,49 @@ class DeepSeekProvider(BaseProvider):
 
     def initialize(self) -> bool:
         """
-        Initialize the DeepSeek provider.
+        Initialize the DeepSeek provider via OpenRouter.
         Load API key from environment and validate.
 
         Returns:
             True if initialization successful, False otherwise
         """
         try:
-            # Get API key from environment
-            api_key_env = self.config.get("api_key_env", "DEEPSEEK_API_KEY")
+            # Get API key from environment (OpenRouter key)
+            api_key_env = self.config.get("api_key_env", "OPENROUTER_API_KEY")
             self._api_key = os.environ.get(api_key_env)
 
             if not self._api_key:
                 self.logger.error(f"API key not found in environment variable: {api_key_env}")
                 return False
 
-            # Get base URL
-            base_url_env = self.config.get("base_url_env", "DEEPSEEK_BASE_URL")
-            self._base_url = os.environ.get(base_url_env) or self.config.get(
-                "default_base_url", "https://api.deepseek.com/v1"
+            # Get base URL (OpenRouter)
+            self._base_url = self.config.get(
+                "default_base_url", "https://openrouter.ai/api/v1"
             )
+
+            # Build headers for OpenRouter
+            headers = {
+                "Authorization": f"Bearer {self._api_key}",
+                "Content-Type": "application/json",
+            }
+
+            # Optional OpenRouter headers
+            site_url = os.environ.get("OPENROUTER_SITE_URL", "")
+            if site_url:
+                headers["HTTP-Referer"] = site_url
+
+            app_name = self.config.get("app_name", "TriModelDeepSearch")
+            if app_name:
+                headers["X-Title"] = app_name
 
             # Initialize async HTTP client
             self._client = httpx.AsyncClient(
                 base_url=self._base_url,
-                headers={
-                    "Authorization": f"Bearer {self._api_key}",
-                    "Content-Type": "application/json"
-                },
+                headers=headers,
                 timeout=self.config.get("timeout", 60.0)
             )
 
-            self.logger.info("DeepSeek provider initialized successfully")
+            self.logger.info(f"DeepSeek provider initialized via OpenRouter (model: {self._model})")
             return True
 
         except Exception as e:
@@ -78,7 +91,7 @@ class DeepSeekProvider(BaseProvider):
 
     async def _call_api(self, messages: list[dict], temperature: float = 0.7) -> str:
         """
-        Make an API call to DeepSeek.
+        Make an API call to DeepSeek via OpenRouter.
 
         Args:
             messages: List of message dictionaries
@@ -183,7 +196,7 @@ class DeepSeekProvider(BaseProvider):
 
         Args:
             research_plan: The unified research plan
-            search_results: Pre-fetched search results
+            search_results: Pre-fetched search results from DuckDuckGo
 
         Returns:
             StageResult containing findings, opinions, gaps, and sources
@@ -200,7 +213,7 @@ class DeepSeekProvider(BaseProvider):
             prompt = self._build_analysis_prompt(research_plan, search_results)
             messages = [{"role": "user", "content": prompt}]
 
-            # Call DeepSeek API
+            # Call DeepSeek API via OpenRouter
             response = await self._call_api(messages, temperature=0.3)
 
             # Parse the response

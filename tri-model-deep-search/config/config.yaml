@@ -73,39 +73,47 @@ logging:
 
 # API credentials (via environment variables - NEVER hardcode secrets)
 credentials:
+  # DeepSeek via OpenRouter
   deepseek:
-    # Environment variable name for DeepSeek API key
-    api_key_env: "DEEPSEEK_API_KEY"
-    # Optional: Environment variable for custom base URL
-    base_url_env: "DEEPSEEK_BASE_URL"
-    # Default base URL if env var not set
-    default_base_url: "https://api.deepseek.com/v1"
-    # Model to use
-    model: "deepseek-chat"
+    # Use OpenRouter API key
+    api_key_env: "OPENROUTER_API_KEY"
+    # OpenRouter base URL
+    default_base_url: "https://openrouter.ai/api/v1"
+    # OpenRouter model name for DeepSeek
+    model: "deepseek/deepseek-chat"
+    # Provider type: openrouter | direct
+    provider_type: "openrouter"
 
+  # Gemini via official AI Studio API (with native search grounding)
   gemini:
-    # Environment variable name for Gemini API key
+    # Google AI Studio API key
     api_key_env: "GEMINI_API_KEY"
-    # Optional: Environment variable for custom base URL
-    base_url_env: "GEMINI_BASE_URL"
-    # Model to use
-    model: "gemini-pro"
+    # Official Gemini API base URL
+    default_base_url: "https://generativelanguage.googleapis.com/v1beta"
+    # Model to use (gemini-1.5-flash or gemini-1.5-pro recommended for grounding)
+    model: "gemini-2.0-flash"
+    # Enable native Google Search grounding
+    enable_grounding: true
+    # Provider type
+    provider_type: "google"
 
+  # OpenAI/ChatGPT via OpenRouter
   openai:
-    # Environment variable name for OpenAI API key
-    api_key_env: "OPENAI_API_KEY"
-    # Optional: Environment variable for custom base URL
-    base_url_env: "OPENAI_BASE_URL"
-    # Default base URL if env var not set
-    default_base_url: "https://api.openai.com/v1"
-    # Model to use
-    model: "gpt-4-turbo-preview"
+    # Use OpenRouter API key
+    api_key_env: "OPENROUTER_API_KEY"
+    # OpenRouter base URL
+    default_base_url: "https://openrouter.ai/api/v1"
+    # OpenRouter model name for GPT-4
+    model: "openai/gpt-4-turbo"
+    # Provider type: openrouter | direct
+    provider_type: "openrouter"
 
-# Search provider configuration
+# Search provider configuration (for DeepSeek and OpenAI stages)
+# Gemini uses native Google Search grounding, so this is only for other providers
 search:
-  # Search provider: serper | serpapi | bing | duckduckgo
-  provider: "serper"
-  # Environment variable for search API key
+  # Search provider: duckduckgo (free) | serper | serpapi
+  provider: "duckduckgo"
+  # Environment variable for search API key (not needed for duckduckgo)
   api_key_env: "SEARCH_API_KEY"
   # Number of results to fetch per query
   results_per_query: 10
@@ -124,3 +132,10 @@ retry:
   backoff_multiplier: 2
   # Maximum backoff delay in seconds
   max_backoff: 16
+
+# OpenRouter specific settings
+openrouter:
+  # Your site URL (for OpenRouter ranking, optional)
+  site_url_env: "OPENROUTER_SITE_URL"
+  # Your app name (for OpenRouter ranking, optional)
+  app_name: "TriModelDeepSearch"
